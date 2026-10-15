@@ -2,13 +2,36 @@ const DISCORD_LIMIT = 2000;
 const TRANSCRIPT_LIMIT = 12000;
 const CUT_NOTE = "\n…（後面截掉了）";
 
-const SYSTEM = `你是 Discord 頻道摘要。只用繁體中文，依序輸出這四段，每段用這個標題開頭：
-## 這段在聊什麼
-## 決定了什麼
-## 誰還有待辦
-## 還沒講完的點
-沒有內容的段落寫「沒有」。不要捏造沒出現的決定或待辦。不要輸出程式碼區塊。整篇少於 1500 字。`;
+const SYSTEM = `  ## 執行步驟 (Steps)
+1. **去噪（Noise Reduction）**：自動過濾「哈哈」、「貼圖」、「早安」等無意義廢話。
+2. **話題分組（Topic Clustering）**：將跳躍式的聊天內容，依據時間或主題切分成不同的「事件線」。
+3. **角色追蹤（User Tracking）**：識別群組裡的主要發言者，以及他們各自的核心立場或爆料。
 
+## 輸出格式規範 (Rules)
+請嚴格遵守以下溫和、口語且結構化的排版輸出：
+
+**【目前熱門話題】**
+*(用一句話說明大家現在在吵什麼或聊什麼，例如：大家正在團購下午茶/在抱怨主管)*
+
+長話短說懶人包
+### [話題時間/主題 A]：(例如：週末聚餐地點)
+- **核心進度**：一句話總結這個話題的最終結論或目前卡在哪裡。
+- **人物意見**：
+  - **【成員A】** 提出了...的看法。
+  - **【成員B】** 反對，因為...。
+
+### [話題時間/主題 B]：(例如：某某人的八卦)
+- **核心進度**：...
+- **人物意見**：...
+
+**【約定與待辦清單】(Action Items)**
+- [ ] **【主揪/負責人】** 具體約定的時間、地點或要做的事（例如：小明週五前要訂位）。
+
+---
+**爬樓小結**：已為您過濾 \`[X]\` 則廢話與貼圖，目前群組氣氛屬於 \`[
+  溫馨 / 歡樂 / 火藥味重 / 揪團中
+]\`。
+`;
 export interface SummarizableMessage {
   type?: number;
   content?: string | null;
@@ -36,7 +59,10 @@ export interface ChatResponse {
   }>;
 }
 
-export type ChatFetch = (url: string, init: ChatRequestInit) => Promise<ChatResponse>;
+export type ChatFetch = (
+  url: string,
+  init: ChatRequestInit,
+) => Promise<ChatResponse>;
 
 export interface SummarizeOptions {
   source?: string;
@@ -58,14 +84,20 @@ export interface ProviderConfig {
 class SummaryFailure extends Error {
   readonly code: "network" | "http";
 
-  constructor(message: string, code: "network" | "http", options?: { cause?: unknown }) {
+  constructor(
+    message: string,
+    code: "network" | "http",
+    options?: { cause?: unknown },
+  ) {
     super(message, options);
     this.name = "SummaryFailure";
     this.code = code;
   }
 }
 
-export function pickMessages<T extends SummarizableMessage>(messages: readonly T[]): T[] {
+export function pickMessages<T extends SummarizableMessage>(
+  messages: readonly T[],
+): T[] {
   return messages.filter((message): message is T => {
     if (!message || message.author?.bot) return false;
     if (message.type !== 0 && message.type !== 19) return false;
@@ -79,7 +111,9 @@ export function buildTranscript(
   maxChars = TRANSCRIPT_LIMIT,
   leadingNote = "",
 ): string {
-  const lines = [...messages].sort((a, b) => timeOf(a) - timeOf(b)).map(formatLine);
+  const lines = [...messages]
+    .sort((a, b) => timeOf(a) - timeOf(b))
+    .map(formatLine);
   const kept: string[] = [];
   let used = 0;
   for (let i = lines.length - 1; i >= 0; i -= 1) {
@@ -113,12 +147,15 @@ export function splitReply(text: string | null | undefined): string[] {
   let second = body.slice(cut).trimStart();
   if (truncated) second += CUT_NOTE;
   if (second.length > DISCORD_LIMIT) {
-    second = second.slice(0, DISCORD_LIMIT - CUT_NOTE.length).trimEnd() + CUT_NOTE;
+    second =
+      second.slice(0, DISCORD_LIMIT - CUT_NOTE.length).trimEnd() + CUT_NOTE;
   }
   return second ? [first, second] : [first];
 }
 
-export function resolveProvider(options: SummarizeOptions = {}): ProviderConfig | { error: string } {
+export function resolveProvider(
+  options: SummarizeOptions = {},
+): ProviderConfig | { error: string } {
   const env = options.env ?? {};
   const source = options.source || env.SUMMARY_SOURCE || "api";
   if (source !== "api" && source !== "local") {
@@ -127,14 +164,16 @@ export function resolveProvider(options: SummarizeOptions = {}): ProviderConfig 
   if (source === "local") {
     return {
       source,
-      baseUrl: options.baseUrl || env.LOCAL_BASE_URL || "http://127.0.0.1:11434/v1",
+      baseUrl:
+        options.baseUrl || env.LOCAL_BASE_URL || "http://127.0.0.1:11434/v1",
       model: options.model || env.LOCAL_MODEL || "llama3.1",
       apiKey: options.apiKey ?? env.LOCAL_API_KEY ?? "",
     };
   }
   return {
     source: "api",
-    baseUrl: options.baseUrl || env.OPENAI_BASE_URL || "https://api.openai.com/v1",
+    baseUrl:
+      options.baseUrl || env.OPENAI_BASE_URL || "https://api.openai.com/v1",
     model: options.model || env.OPENAI_MODEL || "gpt-4o-mini",
     apiKey: options.apiKey ?? env.OPENAI_API_KEY ?? "",
   };
@@ -160,17 +199,30 @@ export async function summarizeMessages(
       baseUrl: provider.baseUrl,
       apiKey: provider.apiKey,
       model: provider.model,
-      transcript: buildTranscript(picked, TRANSCRIPT_LIMIT, options.leadingNote),
+      transcript: buildTranscript(
+        picked,
+        TRANSCRIPT_LIMIT,
+        options.leadingNote,
+      ),
       fetchImpl: options.fetchImpl,
     });
-    const label = provider.source === "local" ? `地端 · ${provider.model}` : `API · ${provider.model}`;
+    const label =
+      provider.source === "local"
+        ? `地端 · ${provider.model}`
+        : `API · ${provider.model}`;
     return { chunks: splitReply(`（${label}）\n${text}`) };
   } catch (error) {
-    if (provider.source === "local" && error instanceof SummaryFailure && error.code === "network") {
+    if (
+      provider.source === "local" &&
+      error instanceof SummaryFailure &&
+      error.code === "network"
+    ) {
       return { chunks: ["地端模型連不上。確認它有在跑。"] };
     }
     if (provider.source === "local") {
-      return { chunks: ["地端模型沒有完成摘要。檢查 LOCAL_BASE_URL 與 LOCAL_MODEL。"] };
+      return {
+        chunks: ["地端模型沒有完成摘要。檢查 LOCAL_BASE_URL 與 LOCAL_MODEL。"],
+      };
     }
     return { chunks: ["摘要沒做成。等一下再試，或檢查 API 金鑰與網址。"] };
   }
@@ -189,23 +241,28 @@ export async function completeChat({
   transcript: string;
   fetchImpl?: ChatFetch;
 }): Promise<string> {
-  const headers: ChatRequestInit["headers"] = { "Content-Type": "application/json" };
+  const headers: ChatRequestInit["headers"] = {
+    "Content-Type": "application/json",
+  };
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
   let response: ChatResponse;
   try {
-    response = await fetchImpl(`${baseUrl.replace(/\/$/, "")}/chat/completions`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model,
-        temperature: 0.2,
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: transcript },
-        ],
-      }),
-    });
+    response = await fetchImpl(
+      `${baseUrl.replace(/\/$/, "")}/chat/completions`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model,
+          temperature: 0.2,
+          messages: [
+            { role: "system", content: SYSTEM },
+            { role: "user", content: transcript },
+          ],
+        }),
+      },
+    );
   } catch (error) {
     throw new SummaryFailure("network", "network", { cause: error });
   }
@@ -230,7 +287,11 @@ function formatLine(message: SummarizableMessage): string {
 function attachmentCount(message: SummarizableMessage): number {
   const attachments = message.attachments;
   if (!attachments) return 0;
-  if (typeof attachments === "object" && "size" in attachments && typeof attachments.size === "number") {
+  if (
+    typeof attachments === "object" &&
+    "size" in attachments &&
+    typeof attachments.size === "number"
+  ) {
     return attachments.size;
   }
   if (Array.isArray(attachments)) return attachments.length;
