@@ -51,13 +51,12 @@ export const summarizeCommand = new SlashCommandBuilder()
 export async function deployCommands() {
   const token = process.env.DISCORD_TOKEN;
   const clientId = process.env.DISCORD_CLIENT_ID;
-  const guildId = process.env.DISCORD_GUILD_ID;
-  if (!token || !clientId || !guildId) {
-    throw new Error("請在 .env 填 DISCORD_TOKEN、DISCORD_CLIENT_ID、DISCORD_GUILD_ID。");
+  if (!token || !clientId) {
+    throw new Error("請在 .env 填 DISCORD_TOKEN、DISCORD_CLIENT_ID。");
   }
 
   const rest = new REST({ version: "10" }).setToken(token);
-  await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
+  await rest.put(Routes.applicationCommands(clientId), {
     body: [summarizeCommand.toJSON()],
   });
 }
@@ -65,7 +64,7 @@ export async function deployCommands() {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   deployCommands()
     .then(() => {
-      console.log("已註冊 /summarize");
+      console.log("已註冊全域 /summarize");
     })
     .catch((error) => {
       console.error(error instanceof Error ? error.message : error);
