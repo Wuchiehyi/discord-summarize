@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { buildTranscript, pickMessages, splitReply, summarizeMessages } from "./summarize.js";
+import { TRUNCATED_NOTE } from "./time-range.js";
+import "./time-range.test.js";
 
 const bot = {
   type: 0,
@@ -22,7 +24,7 @@ const command = {
 
 const picked = pickMessages([bot, human, command]);
 assert.equal(picked.length, 1);
-assert.equal(picked[0].content, "我們決定周五上線");
+assert.equal(picked[0]?.content, "我們決定周五上線");
 
 const transcript = buildTranscript(picked);
 assert.match(transcript, /小明/);
@@ -30,20 +32,20 @@ assert.match(transcript, /周五上線/);
 assert.doesNotMatch(transcript, /機器人在說話/);
 
 const empty = await summarizeMessages([bot, command], { apiKey: "x" });
-assert.equal(empty.chunks[0], "這個頻道最近沒有可摘要的訊息。");
+assert.equal(empty.chunks[0], "這個時段沒有可摘要的訊息。");
 
 const noKey = await summarizeMessages([human], {});
-assert.match(noKey.chunks[0], /OPENAI_API_KEY/);
+assert.match(noKey.chunks[0] ?? "", /OPENAI_API_KEY/);
 
 const parts = splitReply("甲".repeat(2500));
 assert.ok(parts.length <= 2);
 assert.ok(parts.every((part) => part.length <= 2000));
-assert.equal(parts[0].length + parts[1].length, 2500);
+assert.equal((parts[0]?.length ?? 0) + (parts[1]?.length ?? 0), 2500);
 
 const huge = splitReply(`${"乙\n".repeat(3000)}`);
 assert.equal(huge.length, 2);
 assert.ok(huge.every((part) => part.length <= 2000));
-assert.match(huge[1], /後面截掉了/);
+assert.match(huge[1] ?? "", /後面截掉了/);
 
 const oldLine = {
   type: 0,
@@ -65,9 +67,9 @@ assert.doesNotMatch(short, /這則很舊不該出現/);
 const summarized = await summarizeMessages([bot, human], {
   apiKey: "test",
   fetchImpl: async (_url, init) => {
-    const body = JSON.parse(init.body);
-    assert.match(body.messages[1].content, /周五上線/);
-    assert.doesNotMatch(body.messages[1].content, /機器人在說話/);
+    const body = JSON.parse(init.body) as { messages: Array<{ content: string }> };
+    assert.match(body.messages[1]?.content ?? "", /周五上線/);
+    assert.doesNotMatch(body.messages[1]?.content ?? "", /機器人在說話/);
     assert.equal(init.headers.Authorization, "Bearer test");
     return {
       ok: true,
@@ -78,6 +80,20 @@ const summarized = await summarizeMessages([bot, human], {
   },
 });
 assert.deepEqual(summarized.chunks, ["（API · gpt-4o-mini）\n## 這段在聊什麼\n周五上線"]);
+
+const noted = await summarizeMessages([human], {
+  apiKey: "test",
+  leadingNote: TRUNCATED_NOTE,
+  fetchImpl: async (_url, init) => {
+    const body = JSON.parse(init.body) as { messages: Array<{ content: string }> };
+    assert.match(body.messages[1]?.content ?? "", /只留最近 500 則/);
+    return {
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "好" } }] }),
+    };
+  },
+});
+assert.match(noted.chunks[0] ?? "", /好/);
 
 const local = await summarizeMessages([human], {
   source: "local",
@@ -92,7 +108,7 @@ const local = await summarizeMessages([human], {
     };
   },
 });
-assert.match(local.chunks[0], /地端 · qwen2.5/);
+assert.match(local.chunks[0] ?? "", /地端 · qwen2.5/);
 
 const offline = await summarizeMessages([human], {
   source: "local",

@@ -8,13 +8,30 @@ config({ path: resolve(root, ".env") });
 
 export const summarizeCommand = new SlashCommandBuilder()
   .setName("summarize")
-  .setDescription("摘要這個頻道最近的訊息")
-  .addIntegerOption((option) =>
+  .setDescription("摘要這段時間裡的頻道訊息")
+  .addStringOption((option) =>
     option
-      .setName("count")
-      .setDescription("要看最近幾則，10 到 100")
-      .setMinValue(10)
-      .setMaxValue(100)
+      .setName("period")
+      .setDescription("沒填開始時間時用。預設是今天")
+      .setRequired(false)
+      .addChoices(
+        { name: "今天", value: "today" },
+        { name: "昨天", value: "yesterday" },
+        { name: "近 6 小時", value: "6h" },
+        { name: "近 24 小時", value: "24h" },
+        { name: "近 7 天", value: "7d" },
+      ),
+  )
+  .addStringOption((option) =>
+    option
+      .setName("from")
+      .setDescription("開始時間，台北時間，例如 2026-10-15 09:00。有填會蓋過時段")
+      .setRequired(false),
+  )
+  .addStringOption((option) =>
+    option
+      .setName("until")
+      .setDescription("結束時間，不填代表現在。只寫日期則到當天結束")
       .setRequired(false),
   )
   .addBooleanOption((option) =>

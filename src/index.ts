@@ -3,6 +3,7 @@ import { Client, Events, GatewayIntentBits, MessageFlags } from "discord.js";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { summarizeMessages } from "./summarize.js";
+import { fetchMessagesInRange, resolveTimeRange, TRUNCATED_NOTE } from "./time-range.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 config({ path: resolve(root, ".env") });
@@ -23,17 +24,31 @@ export function createBot() {
     const flags = onlyMe ? MessageFlags.Ephemeral : undefined;
     try {
       await interaction.deferReply(flags ? { flags } : {});
+      const range = resolveTimeRange({
+        period: interaction.options.getString("period"),
+        from: interaction.options.getString("from"),
+        until: interaction.options.getString("until"),
+      });
+      if ("error" in range) {
+        await interaction.editReply(range.error);
+        return;
+      }
+
       const channel = interaction.channel;
-      if (!channel || !("messages" in channel) || !channel.messages) {
+      if (!channel?.isTextBased()) {
         await interaction.editReply("這個地方沒有訊息可讀。請在伺服器頻道裡用。");
         return;
       }
 
-      const count = interaction.options.getInteger("count") ?? 30;
-      const fetched = await channel.messages.fetch({ limit: count });
-      const { chunks } = await summarizeMessages([...fetched.values()], {
+      const { messages, truncated } = await fetchMessagesInRange(
+        (options) => channel.messages.fetch(options),
+        range.start,
+        range.end,
+      );
+      const { chunks } = await summarizeMessages(messages, {
         source: interaction.options.getString("source") ?? undefined,
         env: process.env,
+        leadingNote: truncated ? TRUNCATED_NOTE : undefined,
       });
 
       await interaction.editReply(chunks[0]);

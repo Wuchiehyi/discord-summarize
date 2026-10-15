@@ -3,18 +3,25 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "把 Discord 頻道最近的訊息摘要成繁體中文",
+  "description": "把 Discord 頻道一段時間內的訊息摘要成繁體中文",
   "engines": {
     "node": ">=18"
   },
   "scripts": {
-    "start": "node src/index.js",
-    "deploy": "node src/deploy-commands.js",
-    "check": "node --check src/summarize.js && node --check src/index.js && node --check src/deploy-commands.js",
-    "test": "node src/summarize.test.js"
+    "build": "tsc",
+    "prestart": "npm run build",
+    "start": "node dist/index.js",
+    "predeploy": "npm run build",
+    "deploy": "node dist/deploy-commands.js",
+    "check": "tsc --noEmit",
+    "test": "tsc && node dist/summarize.test.js"
   },
   "dependencies": {
     "discord.js": "^14.22.1",
     "dotenv": "^16.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
   }
 }
