@@ -33,7 +33,7 @@ copy .env.example .env
 
 地端模型走同一種介面，預設是 Ollama：`http://127.0.0.1:11434/v1`。先讓它在本機跑著，並把 `LOCAL_MODEL` 設成你已經拉下來的模型名稱。不需要金鑰。LM Studio 把 `LOCAL_BASE_URL` 改成 `http://127.0.0.1:1234/v1`。有的地端服務會要一把假金鑰，那就填 `LOCAL_API_KEY`。
 
-## 啟動
+## 本機開發
 
 ```bash
 npm run deploy
@@ -41,6 +41,25 @@ npm start
 ```
 
 `deploy` 會把這個應用在該伺服器的斜線指令覆寫成只有 `/summarize`。指令註冊後通常幾秒內出現。
+
+## 用 Docker 部署
+
+伺服器要有 Docker，不用另裝 Node 或 npm。Ollama 若跑在同一台機器的 `127.0.0.1:11434`，compose 使用 host 網路，容器可以直接呼叫。
+
+```bash
+git clone https://github.com/Wuchiehyi/discord-summarize.git summerize
+cd summerize
+cp .env.example .env
+```
+
+填好 `.env` 之後：
+
+```bash
+docker compose run --rm --build bot node dist/deploy-commands.js
+docker compose up -d
+```
+
+第一行在 image 裡註冊 `/summarize`。第二行在背景啟動，機器重開後會自己起來。這台電腦上的 `npm start` 要先停掉，同一個權杖不能有兩個連線。更新時在目錄裡 `git pull`，再執行一次 `docker compose up -d --build`。
 
 ## 使用
 

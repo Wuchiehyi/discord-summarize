@@ -1,0 +1,10 @@
+# 伺服器上在專案目錄執行：docker compose up -d --build
+# .env 不進 image。network_mode: host 讓容器沿用這台機器的 127.0.0.1:11434（Ollama）。
+services:
+  bot:
+    build: .
+    image: discord-summarize
+    env_file: .env
+    network_mode: host
+    restart: unless-stopped
+    init: true
